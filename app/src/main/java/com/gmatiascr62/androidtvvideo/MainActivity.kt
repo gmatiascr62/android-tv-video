@@ -1,6 +1,7 @@
 package com.gmatiascr62.androidtvvideo
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,12 +10,15 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.core.content.FileProvider
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
@@ -28,6 +32,7 @@ class MainActivity : Activity() {
     private val updateHandler = Handler(Looper.getMainLooper())
     private var currentVideoUrl: String? = null
     private var retryAttempt = 0
+    private var installPromptedForSha: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +46,6 @@ class MainActivity : Activity() {
         root.addView(contentContainer, FrameLayout.LayoutParams(-1, -1))
 
         updateBanner = TextView(this).apply {
-            text = "Hay una actualización disponible"
             textSize = 14f
             setTextColor(0xFFFFFFFF.toInt())
             setBackgroundColor(0x99000000.toInt())
@@ -161,7 +165,6 @@ class MainActivity : Activity() {
 
     private fun checkForUpdate() {
         thread {
-            var hasUpdate = false
             try {
                 val conn = URL(LATEST_COMMIT_URL).openConnection() as HttpURLConnection
                 conn.connectTimeout = 10000
@@ -169,18 +172,60 @@ class MainActivity : Activity() {
                 conn.setRequestProperty("Accept", "application/vnd.github+json")
                 val json = conn.inputStream.bufferedReader().use { it.readText() }
                 val latestSha = JSONObject(json).getString("sha")
-                hasUpdate = BuildConfig.BUILD_SHA != "unknown" && latestSha != BuildConfig.BUILD_SHA
+                val hasUpdate = BuildConfig.BUILD_SHA != "unknown" && latestSha != BuildConfig.BUILD_SHA
+                if (hasUpdate && latestSha != installPromptedForSha) {
+                    downloadAndInstall(latestSha)
+                }
             } catch (e: Exception) {
                 // Ignore; the next scheduled check will retry.
             }
-            runOnUiThread { updateBanner.visibility = if (hasUpdate) View.VISIBLE else View.GONE }
             scheduleUpdateCheck(UPDATE_CHECK_INTERVAL_MS)
         }
+    }
+
+    private fun downloadAndInstall(latestSha: String) {
+        runOnUiThread { showUpdateBanner("Descargando actualización...") }
+        try {
+            val conn = URL(APK_DOWNLOAD_URL).openConnection() as HttpURLConnection
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+            conn.instanceFollowRedirects = true
+            val apkFile = File(cacheDir, "update.apk")
+            conn.inputStream.use { input ->
+                FileOutputStream(apkFile).use { output -> input.copyTo(output) }
+            }
+            installPromptedForSha = latestSha
+            runOnUiThread {
+                hideUpdateBanner()
+                launchInstaller(apkFile)
+            }
+        } catch (e: Exception) {
+            runOnUiThread { showUpdateBanner("No se pudo descargar la actualización") }
+        }
+    }
+
+    private fun launchInstaller(apkFile: File) {
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apkFile)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    private fun showUpdateBanner(message: String) {
+        updateBanner.text = message
+        updateBanner.visibility = View.VISIBLE
+    }
+
+    private fun hideUpdateBanner() {
+        updateBanner.visibility = View.GONE
     }
 
     companion object {
         const val CONFIG_URL = "https://raw.githubusercontent.com/gmatiascr62/android-tv-video/main/video.json"
         const val LATEST_COMMIT_URL = "https://api.github.com/repos/gmatiascr62/android-tv-video/commits/main"
+        const val APK_DOWNLOAD_URL = "https://github.com/gmatiascr62/android-tv-video/releases/download/latest/app-debug.apk"
         const val CONFIG_POLL_INTERVAL_MS = 30_000L
         const val UPDATE_CHECK_INTERVAL_MS = 30 * 60_000L
         const val RETRY_BASE_DELAY_MS = 3_000L
