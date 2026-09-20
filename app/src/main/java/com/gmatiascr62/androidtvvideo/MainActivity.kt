@@ -29,10 +29,13 @@ class MainActivity : Activity() {
     private fun loadConfig() {
         thread {
             try {
-                val conn = URL(CONFIG_URL).openConnection() as HttpURLConnection
+                val configUrl = "$CONFIG_URL?ts=${System.currentTimeMillis()}"
+                val conn = URL(configUrl).openConnection() as HttpURLConnection
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
-                conn.setRequestProperty("Cache-Control", "no-cache")
+                conn.useCaches = false
+                conn.setRequestProperty("Cache-Control", "no-cache, no-store, must-revalidate")
+                conn.setRequestProperty("Pragma", "no-cache")
                 val json = conn.inputStream.bufferedReader().use { it.readText() }
                 val videoUrl = JSONObject(json).getString("url")
                 runOnUiThread { play(videoUrl) }
