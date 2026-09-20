@@ -1,7 +1,25 @@
+import java.io.ByteArrayOutputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+fun gitCommitSha(): String {
+    val envSha = System.getenv("GITHUB_SHA")
+    if (!envSha.isNullOrBlank()) return envSha
+    return try {
+        val out = ByteArrayOutputStream()
+        exec {
+            commandLine("git", "rev-parse", "HEAD")
+            standardOutput = out
+        }
+        out.toString().trim()
+    } catch (e: Exception) {
+        "unknown"
+    }
+}
+
 android {
     namespace = "com.gmatiascr62.androidtvvideo"
     compileSdk = 35
@@ -11,6 +29,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "BUILD_SHA", "\"${gitCommitSha()}\"")
+    }
+    buildFeatures {
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

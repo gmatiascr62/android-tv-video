@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -21,7 +22,10 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
     private var player: ExoPlayer? = null
     private lateinit var root: FrameLayout
+    private lateinit var contentContainer: FrameLayout
+    private lateinit var updateBanner: TextView
     private val handler = Handler(Looper.getMainLooper())
+    private val updateHandler = Handler(Looper.getMainLooper())
     private var currentVideoUrl: String? = null
     private var retryAttempt = 0
 
@@ -32,16 +36,41 @@ class MainActivity : Activity() {
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         root = FrameLayout(this)
         setContentView(root)
+
+        contentContainer = FrameLayout(this)
+        root.addView(contentContainer, FrameLayout.LayoutParams(-1, -1))
+
+        updateBanner = TextView(this).apply {
+            text = "Hay una actualización disponible"
+            textSize = 14f
+            setTextColor(0xFFFFFFFF.toInt())
+            setBackgroundColor(0x99000000.toInt())
+            setPadding(24, 12, 24, 12)
+            visibility = View.GONE
+        }
+        root.addView(
+            updateBanner,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.END
+            ).apply {
+                bottomMargin = 24
+                marginEnd = 24
+            }
+        )
     }
 
     override fun onStart() {
         super.onStart()
         scheduleConfigCheck(delayMs = 0, forceReplay = false)
+        scheduleUpdateCheck(delayMs = 0)
     }
 
     override fun onStop() {
         super.onStop()
         handler.removeCallbacksAndMessages(null)
+        updateHandler.removeCallbacksAndMessages(null)
         player?.release()
         player = null
         currentVideoUrl = null
@@ -97,10 +126,10 @@ class MainActivity : Activity() {
 
     private fun play(url: String) {
         player?.release()
-        root.removeAllViews()
+        contentContainer.removeAllViews()
         val view = PlayerView(this)
         view.useController = true
-        root.addView(view, FrameLayout.LayoutParams(-1, -1))
+        contentContainer.addView(view, FrameLayout.LayoutParams(-1, -1))
         player = ExoPlayer.Builder(this).build().also {
             view.player = it
             it.addListener(object : Player.Listener {
@@ -115,19 +144,45 @@ class MainActivity : Activity() {
     }
 
     private fun showError(message: String) {
-        root.removeAllViews()
+        contentContainer.removeAllViews()
         val text = TextView(this).apply {
             this.text = message
             textSize = 22f
             setTextColor(0xFFFFFFFF.toInt())
-            gravity = android.view.Gravity.CENTER
+            gravity = Gravity.CENTER
         }
-        root.addView(text, FrameLayout.LayoutParams(-1, -1))
+        contentContainer.addView(text, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun scheduleUpdateCheck(delayMs: Long) {
+        updateHandler.removeCallbacksAndMessages(null)
+        updateHandler.postDelayed({ checkForUpdate() }, delayMs)
+    }
+
+    private fun checkForUpdate() {
+        thread {
+            var hasUpdate = false
+            try {
+                val conn = URL(LATEST_COMMIT_URL).openConnection() as HttpURLConnection
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+                conn.setRequestProperty("Accept", "application/vnd.github+json")
+                val json = conn.inputStream.bufferedReader().use { it.readText() }
+                val latestSha = JSONObject(json).getString("sha")
+                hasUpdate = BuildConfig.BUILD_SHA != "unknown" && latestSha != BuildConfig.BUILD_SHA
+            } catch (e: Exception) {
+                // Ignore; the next scheduled check will retry.
+            }
+            runOnUiThread { updateBanner.visibility = if (hasUpdate) View.VISIBLE else View.GONE }
+            scheduleUpdateCheck(UPDATE_CHECK_INTERVAL_MS)
+        }
     }
 
     companion object {
         const val CONFIG_URL = "https://raw.githubusercontent.com/gmatiascr62/android-tv-video/main/video.json"
+        const val LATEST_COMMIT_URL = "https://api.github.com/repos/gmatiascr62/android-tv-video/commits/main"
         const val CONFIG_POLL_INTERVAL_MS = 30_000L
+        const val UPDATE_CHECK_INTERVAL_MS = 30 * 60_000L
         const val RETRY_BASE_DELAY_MS = 3_000L
         const val MAX_RETRY_DELAY_MS = 60_000L
         const val MAX_RETRY_SHIFT = 5
