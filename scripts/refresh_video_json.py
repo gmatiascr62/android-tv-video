@@ -2,7 +2,6 @@
 """Refresh video.json with the current C5N live stream's master HLS URL."""
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -11,26 +10,9 @@ import yt_dlp
 CHANNEL_LIVE_URL = "https://www.youtube.com/@c5n/live"
 VIDEO_JSON_PATH = Path(__file__).resolve().parent.parent / "video.json"
 
-# Si existe, se usa para autenticar con YouTube y evitar el bloqueo de
-# "Sign in to confirm you're not a bot" que tiran las IPs de datacenter
-# (como las de GitHub Actions). Se genera en el workflow a partir del
-# secreto YT_COOKIES.
-COOKIES_FILE = os.environ.get("YT_COOKIES_FILE")
-
 
 def get_master_hls_url(url: str) -> str | None:
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        # El cliente "android" no devuelve variantes HLS para este stream
-        # (formats vacío). Usamos "web", que sí las trae -- pero ese
-        # cliente le exige a veces un PO token extra a las cookies, que
-        # resolvemos con el plugin bgutil-ytdlp-pot-provider + su servicio
-        # (ver workflow).
-        "extractor_args": {"youtube": {"player_client": ["web"]}},
-    }
-    if COOKIES_FILE and Path(COOKIES_FILE).is_file():
-        ydl_opts["cookiefile"] = COOKIES_FILE
+    ydl_opts = {"quiet": True, "no_warnings": True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
