@@ -2,9 +2,11 @@ name: Refresh C5N stream URL
 
 on:
   workflow_dispatch:
-  # Desactivado hasta confirmar que el secreto YT_COOKIES resuelve el
-  # bloqueo de YouTube ("Sign in to confirm you're not a bot") a las IPs
-  # de GitHub Actions. Una vez probado con un run manual, descomentar.
+  # Desactivado por ahora: YouTube bloquea las IPs de GitHub Actions con
+  # "Sign in to confirm you're not a bot", así que el cron solo fallaba en
+  # silencio cada 15 min. Se puede reactivar (descomentando el schedule) el
+  # día que se resuelva el bloqueo, por ejemplo pasándole cookies de sesión
+  # a yt-dlp.
   # schedule:
   #   - cron: "*/15 * * * *"
 
@@ -18,15 +20,6 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    services:
-      # Genera los "PO tokens" que YouTube le exige al cliente "web" además
-      # de las cookies. Sin esto, yt-dlp tira "The page needs to be
-      # reloaded". El plugin de Python se conecta solo a este servicio en
-      # localhost:4416.
-      bgutil-provider:
-        image: brainicism/bgutil-ytdlp-pot-provider
-        ports:
-          - 4416:4416
     steps:
       - uses: actions/checkout@v4
 
@@ -35,24 +28,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install yt-dlp
-        run: pip install -U yt-dlp bgutil-ytdlp-pot-provider
-
-      - name: Write YouTube cookies (if configured)
-        run: |
-          if [ -n "${{ secrets.YT_COOKIES }}" ]; then
-            printf '%s' "${{ secrets.YT_COOKIES }}" > "$RUNNER_TEMP/yt_cookies.txt"
-            echo "YT_COOKIES_FILE=$RUNNER_TEMP/yt_cookies.txt" >> "$GITHUB_ENV"
-            echo "Cookies cargadas."
-          else
-            echo "Sin secreto YT_COOKIES configurado, se sigue sin cookies."
-          fi
+        run: pip install -U yt-dlp
 
       - name: Extract current live stream URL
         run: python scripts/refresh_video_json.py
-
-      - name: Remove cookies file
-        if: always()
-        run: rm -f "$RUNNER_TEMP/yt_cookies.txt"
 
       - name: Commit and push if changed
         run: |
