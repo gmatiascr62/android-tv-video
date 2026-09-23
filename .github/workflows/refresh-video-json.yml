@@ -1,9 +1,14 @@
 name: Refresh C5N stream URL
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
+  # Desactivado por ahora: YouTube bloquea las IPs de GitHub Actions con
+  # "Sign in to confirm you're not a bot", así que el cron solo fallaba en
+  # silencio cada 15 min. Se puede reactivar (descomentando el schedule) el
+  # día que se resuelva el bloqueo, por ejemplo pasándole cookies de sesión
+  # a yt-dlp.
+  # schedule:
+  #   - cron: "*/15 * * * *"
 
 permissions:
   contents: write
