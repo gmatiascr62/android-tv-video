@@ -19,7 +19,14 @@ COOKIES_FILE = os.environ.get("YT_COOKIES_FILE")
 
 
 def get_master_hls_url(url: str) -> str | None:
-    ydl_opts = {"quiet": True, "no_warnings": True}
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        # El cliente "web" le exige a veces un PO token extra que yt-dlp no
+        # siempre puede resolver ("The page needs to be reloaded"). El
+        # cliente "android" no lo pide, así que lo probamos primero.
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+    }
     if COOKIES_FILE and Path(COOKIES_FILE).is_file():
         ydl_opts["cookiefile"] = COOKIES_FILE
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
