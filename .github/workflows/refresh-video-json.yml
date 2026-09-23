@@ -18,6 +18,15 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    services:
+      # Genera los "PO tokens" que YouTube le exige al cliente "web" además
+      # de las cookies. Sin esto, yt-dlp tira "The page needs to be
+      # reloaded". El plugin de Python se conecta solo a este servicio en
+      # localhost:4416.
+      bgutil-provider:
+        image: brainicism/bgutil-ytdlp-pot-provider
+        ports:
+          - 4416:4416
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +35,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install yt-dlp
-        run: pip install -U yt-dlp
+        run: pip install -U yt-dlp bgutil-ytdlp-pot-provider
 
       - name: Write YouTube cookies (if configured)
         run: |
