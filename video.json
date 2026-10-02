@@ -23,6 +23,22 @@
     {
       "name": "DAZN F1",
       "url": "http://miotv.cc:8080/live/ZONA9777/ecKtAggBQQJE/134172.m3u8"
+    },
+    {
+      "name": "EL TRECE",
+      "url": "http://miotv.cc:8080/live/ZONA9777/ecKtAggBQQJE/272044.m3u8"
+    },
+    {
+      "name": "TN NOTICIAS HD",
+      "url": "http://miotv.cc:8080/live/ZONA9777/ecKtAggBQQJE/272053.m3u8"
+    },
+    {
+      "name": "A24 HD",
+      "url": "http://miotv.cc:8080/live/ZONA9777/ecKtAggBQQJE/272055.m3u8"
+    },
+    {
+      "name": "LA NACION HD",
+      "url": "http://miotv.cc:8080/live/ZONA9777/ecKtAggBQQJE/272048.m3u8"
     }
   ]
 }
